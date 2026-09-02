@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import RoleSelect from "./pages/RoleSelect.jsx";
 import PatientAuth from "./pages/PatientAuth.jsx";
 import DoctorAuth from "./pages/DoctorAuth.jsx";
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/patient/profile" element={<PatientProfile />} />
         <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
       </Routes>
+      <Analytics />
     </BrowserRouter>
   );
 }
