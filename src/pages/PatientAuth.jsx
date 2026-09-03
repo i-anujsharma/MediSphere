@@ -4,12 +4,28 @@ import { supabase } from "../supabaseClient.js";
 
 export default function PatientAuth() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot"
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setResetSent(true);
+  }
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -64,57 +80,101 @@ export default function PatientAuth() {
 
   return (
     <div className="shell">
-      <div className="brand">MediKiosk</div>
-      <div className="subtitle">Patient {mode === "login" ? "login" : "sign up"}</div>
+      <div className="brand">MediSphere</div>
+      <div className="subtitle">
+        Patient {mode === "login" ? "login" : mode === "signup" ? "sign up" : "password reset"}
+      </div>
 
       <div className="card">
-        <form onSubmit={mode === "login" ? handleLogin : handleSignup}>
-          {mode === "signup" && (
+        {mode === "forgot" ? (
+          resetSent ? (
             <>
-              <label>Full name</label>
+              <p className="helper-text">
+                If an account exists for {email}, a password reset link has been sent.
+                Check your inbox (and spam folder).
+              </p>
+              <button className="link-btn" onClick={() => { setMode("login"); setResetSent(false); }}>
+                Back to login
+              </button>
+            </>
+          ) : (
+            <form onSubmit={handleForgotPassword}>
+              <label>Email</label>
               <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              {error && <div className="error-text">{error}</div>}
+              <button className="btn-primary" type="submit" disabled={loading}>
+                {loading ? "Sending..." : "Send reset link"}
+              </button>
+              <p className="helper-text">
+                <button type="button" className="link-btn" onClick={() => setMode("login")}>
+                  Back to login
+                </button>
+              </p>
+            </form>
+          )
+        ) : (
+          <>
+            <form onSubmit={mode === "login" ? handleLogin : handleSignup}>
+              {mode === "signup" && (
+                <>
+                  <label>Full name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </>
+              )}
+
+              <label>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
 
-            </>
-          )}
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
 
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+              {error && <div className="error-text">{error}</div>}
 
-          <label>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
+              <button className="btn-primary" type="submit" disabled={loading}>
+                {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}
+              </button>
+            </form>
 
-          {error && <div className="error-text">{error}</div>}
+            {mode === "login" && (
+              <p className="helper-text">
+                <button className="link-btn" onClick={() => setMode("forgot")}>
+                  Forgot password?
+                </button>
+              </p>
+            )}
 
-          <button className="btn-primary" type="submit" disabled={loading}>
-            {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}
-          </button>
-        </form>
-
-        <p className="helper-text">
-          {mode === "login" ? "New patient? " : "Already have an account? "}
-          <button
-            className="link-btn"
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-          >
-            {mode === "login" ? "Sign up" : "Log in"}
-          </button>
-        </p>
+            <p className="helper-text">
+              {mode === "login" ? "New patient? " : "Already have an account? "}
+              <button
+                className="link-btn"
+                onClick={() => setMode(mode === "login" ? "signup" : "login")}
+              >
+                {mode === "login" ? "Sign up" : "Log in"}
+              </button>
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

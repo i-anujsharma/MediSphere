@@ -2,10 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient.js";
 import ConsultationCard from "../components/ConsultationCard.jsx";
+import Sidebar from "../components/Sidebar.jsx";
+import TopBar from "../components/TopBar.jsx";
 
 export default function DoctorDashboard() {
   const navigate = useNavigate();
   const [doctorId, setDoctorId] = useState(null);
+  const [name, setName] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [queue, setQueue] = useState([]);
   const [myCases, setMyCases] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -21,10 +25,16 @@ export default function DoctorDashboard() {
       setDoctorId(data.user.id);
       loadQueue();
       loadMyCases(data.user.id);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", data.user.id)
+        .single();
+      setName(profile?.name || "Doctor");
     }
     init();
 
-    // Refresh the queue periodically so new patients show up without a manual reload.
     const interval = setInterval(() => {
       loadQueue();
     }, 8000);
@@ -51,8 +61,6 @@ export default function DoctorDashboard() {
     setMyCases(data || []);
   }
 
-  // "Accept" locks the case to this doctor so two doctors can't take the
-  // same patient at once.
   async function handleAccept(consultation) {
     const { data, error } = await supabase
       .from("consultations")
@@ -62,7 +70,7 @@ export default function DoctorDashboard() {
         accepted_at: new Date().toISOString(),
       })
       .eq("id", consultation.id)
-      .eq("status", "waiting") // only succeeds if still unclaimed
+      .eq("status", "waiting")
       .select()
       .single();
 
@@ -93,70 +101,91 @@ export default function DoctorDashboard() {
     loadMyCases(doctorId);
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    navigate("/");
-  }
+  const urgentCount = queue.filter((c) => c.red_flag).length;
 
   if (selected) {
     return (
-      <div className="shell">
-        <div className="top-bar">
-          <div className="brand">MediKiosk</div>
-          <button className="btn-secondary" onClick={() => setSelected(null)}>
-            Back to queue
-          </button>
-        </div>
+      <div className="app-shell">
+        <TopBar onMenuClick={() => setSidebarOpen(true)} title="Case review" />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          role="doctor"
+          name={name}
+          subtitle="Doctor account"
+        />
+        <div className="shell">
+          <div className="card">
+            <div className="top-bar" style={{ marginBottom: 8 }}>
+              <h3 style={{ margin: 0 }}>
+                {selected.red_flag ? "Urgent case" : "Case summary"}
+              </h3>
+              <button className="btn-secondary" onClick={() => setSelected(null)}>
+                Back to queue
+              </button>
+            </div>
+            {selected.red_flag && (
+              <p className="error-text">Red flag reason: {selected.red_flag_reason}</p>
+            )}
+            <div className="summary-box">{selected.ai_summary}</div>
 
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>
-            {selected.red_flag ? "Urgent case" : "Case summary"}
-          </h3>
-          {selected.red_flag && (
-            <p className="error-text">Red flag reason: {selected.red_flag_reason}</p>
-          )}
-          <div className="summary-box">{selected.ai_summary}</div>
+            <label>Your notes / reply to patient</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
 
-          <label>Your notes / reply to patient</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
-
-          <button className="btn-primary" onClick={handleComplete}>
-            Approve &amp; send reply
-          </button>
+            <button className="btn-primary" onClick={handleComplete}>
+              Approve &amp; send reply
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="shell">
-      <div className="top-bar">
-        <div>
-          <div className="brand">MediKiosk</div>
-          <div className="subtitle" style={{ marginBottom: 0 }}>
-            Doctor dashboard
+    <div className="app-shell">
+      <TopBar onMenuClick={() => setSidebarOpen(true)} title="Doctor dashboard" notifCount={urgentCount} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        role="doctor"
+        name={name}
+        subtitle="Doctor account"
+      />
+
+      <div className="shell">
+        <div className="stat-row">
+          <div className="stat-card">
+            <div className="stat-value">{queue.length}</div>
+            <div className="stat-label">Patients waiting</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value" style={{ color: urgentCount > 0 ? "var(--coral)" : undefined }}>
+              {urgentCount}
+            </div>
+            <div className="stat-label">Urgent cases</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{myCases.length}</div>
+            <div className="stat-label">Your active cases</div>
           </div>
         </div>
-        <button className="btn-secondary" onClick={handleLogout}>
-          Log out
-        </button>
-      </div>
 
-      {myCases.length > 0 && (
+        {myCases.length > 0 && (
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>Your active cases</h3>
+            {myCases.map((c) => (
+              <ConsultationCard key={c.id} consultation={c} onOpen={setSelected} />
+            ))}
+          </div>
+        )}
+
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Your active cases</h3>
-          {myCases.map((c) => (
-            <ConsultationCard key={c.id} consultation={c} onOpen={setSelected} />
+          <h3 style={{ marginTop: 0 }}>Live queue</h3>
+          {queue.length === 0 && <p className="helper-text">No patients waiting right now.</p>}
+          {queue.map((c) => (
+            <ConsultationCard key={c.id} consultation={c} onOpen={handleAccept} />
           ))}
         </div>
-      )}
-
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Live queue</h3>
-        {queue.length === 0 && <p className="helper-text">No patients waiting right now.</p>}
-        {queue.map((c) => (
-          <ConsultationCard key={c.id} consultation={c} onOpen={handleAccept} />
-        ))}
       </div>
     </div>
   );

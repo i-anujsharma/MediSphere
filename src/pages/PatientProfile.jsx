@@ -94,7 +94,7 @@ export default function PatientProfile() {
   return (
     <div className="shell">
       <div className="top-bar">
-        <div className="brand">MediKiosk</div>
+        <div className="brand">MediSphere</div>
         <button className="btn-secondary" onClick={() => navigate("/patient/dashboard")}>
           Back to dashboard
         </button>
@@ -120,7 +120,7 @@ export default function PatientProfile() {
           />
           <p className="helper-text">
             Don't have one linked yet? You can add it later — it isn't required to use
-            MediKiosk.
+            MediSphere.
           </p>
 
           <label>Date of birth</label>

@@ -6,7 +6,7 @@ export default function RoleSelect() {
 
   return (
     <div className="shell">
-      <div className="brand">MediKiosk</div>
+      <div className="brand">MediSphere</div>
       <div className="subtitle">AI-powered patient case-taking platform</div>
 
       <div className="role-grid">
