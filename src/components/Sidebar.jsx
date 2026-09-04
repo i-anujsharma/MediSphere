@@ -1,11 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient.js";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 const PATIENT_LINKS = [
   { label: "Dashboard", path: "/patient/dashboard", icon: "home" },
   { label: "Medicine reminders", path: "/patient/dashboard#reminders", icon: "bell" },
-  { label: "Case history", path: "/patient/dashboard#history", icon: "history" },
+  { label: "Case history", path: "/patient/history", icon: "history" },
   { label: "My profile", path: "/patient/profile", icon: "user" },
 ];
 
@@ -71,6 +72,11 @@ export default function Sidebar({ open, onClose, role, name, subtitle }) {
             </button>
           ))}
         </nav>
+
+        <div className="sidebar-theme-row">
+          Dark mode
+          <ThemeToggle />
+        </div>
 
         <button className="sidebar-link sidebar-logout" onClick={handleLogout}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

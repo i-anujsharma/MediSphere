@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../supabaseClient.js";
 import VoiceInput from "../components/VoiceInput.jsx";
 import OcrUpload from "../components/OcrUpload.jsx";
@@ -7,8 +7,10 @@ import Sidebar from "../components/Sidebar.jsx";
 import TopBar from "../components/TopBar.jsx";
 import AlarmModal from "../components/AlarmModal.jsx";
 import ChatbotWidget from "../components/ChatbotWidget.jsx";
+import ToastStack from "../components/ToastStack.jsx";
 import { generateSummary } from "../lib/aiSummary.js";
 import { useMedicineAlarm } from "../lib/useMedicineAlarm.js";
+import { usePatientRealtimeNotifications } from "../lib/useRealtimeNotifications.js";
 
 const QUESTIONS = [
   "What symptoms are you experiencing?",
@@ -28,6 +30,8 @@ export default function PatientDashboard() {
   const [submitted, setSubmitted] = useState(null);
   const [consultations, setConsultations] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [selectedMember, setSelectedMember] = useState(null);
   const [newReminder, setNewReminder] = useState({
     medicine_name: "",
     dosage: "",
@@ -36,6 +40,9 @@ export default function PatientDashboard() {
   });
 
   const { dueReminder, dismiss } = useMedicineAlarm(reminders);
+  const { toasts, dismissToast } = usePatientRealtimeNotifications(userId, () =>
+    loadConsultations(userId)
+  );
 
   useEffect(() => {
     async function init() {
@@ -47,6 +54,7 @@ export default function PatientDashboard() {
       setUserId(data.user.id);
       loadConsultations(data.user.id);
       loadReminders(data.user.id);
+      loadFamilyMembers(data.user.id);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -65,6 +73,15 @@ export default function PatientDashboard() {
       .eq("patient_id", id)
       .order("created_at", { ascending: false });
     setConsultations(data || []);
+  }
+
+  async function loadFamilyMembers(id) {
+    const { data } = await supabase
+      .from("family_members")
+      .select("id, name, relation")
+      .eq("patient_id", id)
+      .order("created_at", { ascending: true });
+    setFamilyMembers(data || []);
   }
 
   async function loadReminders(id) {
@@ -91,7 +108,7 @@ export default function PatientDashboard() {
       answer: answers[i],
     }));
 
-    const { summary, redFlag, reason } = await generateSummary({
+    const { summary, redFlag, reason, severity } = await generateSummary({
       answers: answerPairs,
       ocrText,
     });
@@ -104,6 +121,8 @@ export default function PatientDashboard() {
         ai_summary: summary,
         red_flag: redFlag,
         red_flag_reason: reason,
+        severity,
+        for_family_member_id: selectedMember,
       })
       .select()
       .single();
@@ -126,6 +145,9 @@ export default function PatientDashboard() {
       }
 
       setSubmitted({ summary, redFlag });
+      setAnswers(QUESTIONS.map(() => ""));
+      setOcrText("");
+      setSelectedMember(null);
       loadConsultations(userId);
     }
 
@@ -181,6 +203,32 @@ export default function PatientDashboard() {
         {!submitted && (
           <div className="card">
             <h3 style={{ marginTop: 0 }}>Tell us what's going on</h3>
+
+            {familyMembers.length > 0 && (
+              <>
+                <label style={{ marginTop: 0 }}>Who is this for?</label>
+                <div className="chip-row">
+                  <button
+                    type="button"
+                    className={`chip ${selectedMember === null ? "active" : ""}`}
+                    onClick={() => setSelectedMember(null)}
+                  >
+                    Myself
+                  </button>
+                  {familyMembers.map((m) => (
+                    <button
+                      type="button"
+                      key={m.id}
+                      className={`chip ${selectedMember === m.id ? "active" : ""}`}
+                      onClick={() => setSelectedMember(m.id)}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
             {QUESTIONS.map((q, i) => (
               <div key={q}>
                 <label>{q}</label>
@@ -275,13 +323,25 @@ export default function PatientDashboard() {
         </div>
 
         <div className="card" id="history">
-          <h3 style={{ marginTop: 0 }}>Your case history</h3>
+          <div className="top-bar" style={{ marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>Recent cases</h3>
+            <Link to="/patient/history" className="link-btn">
+              View full history
+            </Link>
+          </div>
           {consultations.length === 0 && (
             <p className="helper-text">No cases submitted yet.</p>
           )}
-          {consultations.map((c) => (
-            <div key={c.id} className={`queue-item ${c.red_flag ? "flagged" : ""}`}>
+          {consultations.slice(0, 3).map((c) => (
+            <div
+              key={c.id}
+              className={`queue-item ${
+                c.severity === "urgent" ? "flagged" : c.severity === "moderate" ? "moderate" : ""
+              }`}
+              onClick={() => navigate("/patient/history")}
+            >
               <div>
+                <span className={`severity-dot ${c.severity || "routine"}`} />
                 <span className="badge">{c.status}</span>
                 {c.doctor_notes && (
                   <div className="helper-text" style={{ marginTop: 6 }}>
@@ -294,6 +354,7 @@ export default function PatientDashboard() {
         </div>
       </div>
 
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <AlarmModal reminder={dueReminder} onDismiss={dismiss} />
       <ChatbotWidget />
     </div>

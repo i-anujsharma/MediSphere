@@ -16,6 +16,20 @@ const RED_FLAG_KEYWORDS = [
   "poisoning",
 ];
 
+// Second tier of keywords: not immediately life-threatening, but worth
+// bumping ahead of routine cases in the doctor's queue.
+const MODERATE_KEYWORDS = [
+  "high fever",
+  "persistent vomiting",
+  "severe pain",
+  "worsening",
+  "dehydration",
+  "fainted",
+  "fainting",
+  "blood in",
+  "allergic reaction",
+];
+
 export function checkRedFlag(text) {
   const lower = text.toLowerCase();
   const match = RED_FLAG_KEYWORDS.find((kw) => lower.includes(kw));
@@ -23,6 +37,19 @@ export function checkRedFlag(text) {
     redFlag: Boolean(match),
     reason: match || null,
   };
+}
+
+// Three-tier triage used to sort and badge the doctor's queue: urgent
+// (red-flag keywords), moderate (worth prioritizing), routine (default).
+export function checkSeverity(text) {
+  const lower = text.toLowerCase();
+  const urgentMatch = RED_FLAG_KEYWORDS.find((kw) => lower.includes(kw));
+  if (urgentMatch) return { severity: "urgent", reason: urgentMatch };
+
+  const moderateMatch = MODERATE_KEYWORDS.find((kw) => lower.includes(kw));
+  if (moderateMatch) return { severity: "moderate", reason: moderateMatch };
+
+  return { severity: "routine", reason: null };
 }
 
 // Calls Gemini's free-tier API to turn raw patient answers into a
@@ -34,13 +61,14 @@ export async function generateSummary({ answers, ocrText }) {
   const fullText = `${combinedAnswers}\n${ocrText || ""}`;
 
   const redFlagResult = checkRedFlag(fullText);
+  const { severity } = checkSeverity(fullText);
 
   if (!apiKey) {
     // Fallback: basic template summary, no external call.
     const fallbackSummary = `Patient-reported symptoms:\n${combinedAnswers}${
       ocrText ? `\n\nDocument text (OCR):\n${ocrText}` : ""
     }`;
-    return { summary: fallbackSummary, ...redFlagResult };
+    return { summary: fallbackSummary, severity, ...redFlagResult };
   }
 
   try {
@@ -66,11 +94,12 @@ export async function generateSummary({ answers, ocrText }) {
     const summary =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       `Patient-reported symptoms:\n${combinedAnswers}`;
-    return { summary, ...redFlagResult };
+    return { summary, severity, ...redFlagResult };
   } catch (err) {
     // Network/API failure shouldn't block the patient -- fall back gracefully.
     return {
       summary: `Patient-reported symptoms:\n${combinedAnswers}`,
+      severity,
       ...redFlagResult,
     };
   }

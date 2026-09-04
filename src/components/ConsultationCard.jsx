@@ -1,15 +1,22 @@
 import React from "react";
 
-export default function ConsultationCard({ consultation, onOpen }) {
+export default function ConsultationCard({ consultation, onOpen, familyMemberName }) {
+  const severity = consultation.severity || (consultation.red_flag ? "urgent" : "routine");
+  const rowClass =
+    severity === "urgent" ? "flagged" : severity === "moderate" ? "moderate" : "";
+
   return (
     <div
-      className={`queue-item ${consultation.red_flag ? "flagged" : ""}`}
+      className={`queue-item ${rowClass}`}
       onClick={() => onOpen(consultation)}
       style={{ cursor: "pointer" }}
     >
       <div>
-        {consultation.red_flag && <span className="badge flag">Urgent</span>}{" "}
-        <span className="badge">{consultation.status}</span>
+        <span className={`severity-dot ${severity}`} />
+        {severity === "urgent" && <span className="badge flag">Urgent</span>}{" "}
+        {severity === "moderate" && <span className="badge warning">Priority</span>}{" "}
+        <span className="badge">{consultation.status}</span>{" "}
+        {familyMemberName && <span className="badge outline">for {familyMemberName}</span>}
         <div className="helper-text" style={{ marginTop: 6 }}>
           {consultation.ai_summary?.slice(0, 90)}...
         </div>

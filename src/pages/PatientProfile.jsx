@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient.js";
+import ThemeToggle from "../components/ThemeToggle.jsx";
 
 export default function PatientProfile() {
   const navigate = useNavigate();
@@ -16,6 +17,10 @@ export default function PatientProfile() {
   const [gender, setGender] = useState("");
   const [emergencyContact, setEmergencyContact] = useState("");
   const [preferredLanguage, setPreferredLanguage] = useState("en");
+
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [newMember, setNewMember] = useState({ name: "", relation: "", dob: "", gender: "" });
+  const [addingMember, setAddingMember] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -48,10 +53,46 @@ export default function PatientProfile() {
         setGender(patient.gender || "");
         setEmergencyContact(patient.emergency_contact_number || "");
       }
+
+      loadFamilyMembers(data.user.id);
       setLoading(false);
     }
     load();
   }, [navigate]);
+
+  async function loadFamilyMembers(id) {
+    const { data } = await supabase
+      .from("family_members")
+      .select("*")
+      .eq("patient_id", id)
+      .order("created_at", { ascending: true });
+    setFamilyMembers(data || []);
+  }
+
+  async function handleAddMember(e) {
+    e.preventDefault();
+    if (!newMember.name.trim()) return;
+    setAddingMember(true);
+    const { error: memberError } = await supabase.from("family_members").insert({
+      patient_id: userId,
+      name: newMember.name,
+      relation: newMember.relation || null,
+      dob: newMember.dob || null,
+      gender: newMember.gender || null,
+    });
+    setAddingMember(false);
+    if (memberError) {
+      alert("Could not add family member: " + memberError.message);
+      return;
+    }
+    setNewMember({ name: "", relation: "", dob: "", gender: "" });
+    loadFamilyMembers(userId);
+  }
+
+  async function handleRemoveMember(id) {
+    await supabase.from("family_members").delete().eq("id", id);
+    loadFamilyMembers(userId);
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -102,9 +143,12 @@ export default function PatientProfile() {
     <div className="shell">
       <div className="top-bar">
         <div className="brand">MediSphere</div>
-        <button className="btn-secondary" onClick={() => navigate("/patient/dashboard")}>
-          Back to dashboard
-        </button>
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <button className="btn-secondary" onClick={() => navigate("/patient/dashboard")}>
+            Back to dashboard
+          </button>
+        </div>
       </div>
 
       <div className="card">
@@ -171,6 +215,65 @@ export default function PatientProfile() {
 
           <button className="btn-primary" type="submit" disabled={saving}>
             {saving ? "Saving..." : "Save profile"}
+          </button>
+        </form>
+      </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Family members</h3>
+        <p className="helper-text">
+          Add family members you look after — you can submit a case on their behalf and
+          keep their history separate from your own.
+        </p>
+
+        {familyMembers.length === 0 && (
+          <p className="helper-text">No family members added yet.</p>
+        )}
+        {familyMembers.map((m) => (
+          <div className="reminder-row" key={m.id}>
+            <div style={{ flex: 1 }}>
+              <strong>{m.name}</strong>
+              {m.relation ? ` — ${m.relation}` : ""}
+              {m.dob ? ` — b. ${m.dob}` : ""}
+            </div>
+            <button className="link-btn" onClick={() => handleRemoveMember(m.id)}>
+              Remove
+            </button>
+          </div>
+        ))}
+
+        <form onSubmit={handleAddMember} style={{ marginTop: 16 }}>
+          <label>Name</label>
+          <input
+            type="text"
+            value={newMember.name}
+            onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+          />
+          <label>Relation</label>
+          <input
+            type="text"
+            placeholder="e.g. Mother, Son"
+            value={newMember.relation}
+            onChange={(e) => setNewMember({ ...newMember, relation: e.target.value })}
+          />
+          <label>Date of birth</label>
+          <input
+            type="date"
+            value={newMember.dob}
+            onChange={(e) => setNewMember({ ...newMember, dob: e.target.value })}
+          />
+          <label>Gender</label>
+          <select
+            value={newMember.gender}
+            onChange={(e) => setNewMember({ ...newMember, gender: e.target.value })}
+          >
+            <option value="">Prefer not to say</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+            <option value="other">Other</option>
+          </select>
+          <button className="btn-primary" type="submit" disabled={addingMember}>
+            {addingMember ? "Adding..." : "Add family member"}
           </button>
         </form>
       </div>

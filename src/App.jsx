@@ -5,6 +5,7 @@ import PatientAuth from "./pages/PatientAuth.jsx";
 import DoctorAuth from "./pages/DoctorAuth.jsx";
 import PatientDashboard from "./pages/PatientDashboard.jsx";
 import PatientProfile from "./pages/PatientProfile.jsx";
+import PatientHistory from "./pages/PatientHistory.jsx";
 import DoctorDashboard from "./pages/DoctorDashboard.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
 
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/doctor/login" element={<DoctorAuth />} />
         <Route path="/patient/dashboard" element={<PatientDashboard />} />
         <Route path="/patient/profile" element={<PatientProfile />} />
+        <Route path="/patient/history" element={<PatientHistory />} />
         <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
