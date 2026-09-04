@@ -61,25 +61,32 @@ export default function PatientProfile() {
 
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ name, preferred_language: preferredLanguage })
-      .eq("id", userId);
+      .upsert({
+        id: userId,
+        role: "patient",
+        name,
+        preferred_language: preferredLanguage,
+      });
 
     const { error: patientError } = await supabase
       .from("patients")
-      .update({
+      .upsert({
+        id: userId,
         abha_id: abhaId || null,
         dob: dob || null,
         gender: gender || null,
         emergency_contact_number: emergencyContact || null,
-      })
-      .eq("id", userId);
+      });
 
     setSaving(false);
 
     if (profileError || patientError) {
-      setError((profileError || patientError).message);
+      const err = profileError || patientError;
+      alert("SAVE FAILED:\n" + JSON.stringify(err, null, 2));
+      setError(err.message);
       return;
     }
+    alert("SAVE SUCCEEDED for userId: " + userId);
     setSaved(true);
   }
 
